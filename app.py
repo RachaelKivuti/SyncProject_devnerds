@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
-from engine import Base, Employee, Contractor, Job, Bid
+from engine import Base, Employee, Contractor, Job, Bid, Milestone
 from datetime import datetime
 from uuid import uuid4
 from sys import argv
@@ -8,11 +8,14 @@ import urllib
 
 app = Flask(__name__)
 
+
+# user = 'root'
+# pwd = urllib.parse.quote('!@mElv!s@19')
+# database = 'devnerds'
+
 user = ''
 pwd = ''
 database = ''
-
-
 
 app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+mysqldb://{user}:{pwd}@localhost:3306/{database}'
 db = SQLAlchemy(app)
@@ -91,8 +94,8 @@ def get_employee():
 @app.route('/api/v1.0/jobs', methods=["GET"])
 def get_jobs():
     with db.session.begin():
-        jobs = db.session.execute(db.select(Job).filter_by(job_state='bid_on')).all()
-        job_list = [dict(job) for job in jobs]
+        jobs = db.session.execute(db.select(Job).filter_by(job_state='bid_on')).scalars()
+        job_list = [job.to_dict() for job in jobs]
     return jsonify({'jobs': job_list})
 
 @app.route('/api/v1.0/jobs', methods=['POST'])
@@ -139,3 +142,43 @@ def bid_job():
         db.session.add(new_bid)
         db.session.commit()
         return jsonify({'message': f'job bidded successively'})
+
+
+@app.route('/api/v1.0/add_milestone', methods=['POST'])
+def add_milestone():
+    data = request.json
+    job_id = data['job_id']
+    milestone_name = data['milestone_name']
+    start_date = data['start_date']
+    end_date = data['end_date']
+    milestone_id = str(uuid4())
+    
+    new_milestone = Milestone(
+        milestone_id = milestone_id,
+        milestone_name = milestone_name,
+        job_id = job_id,
+        start_date = start_date,
+        end_date = end_date
+    )
+    db.session.add(new_milestone)
+    db.session.commit()
+    return jsonify({'message': 'milestone added successively'})
+
+@app.route('/api/v1.0/employee_overview')
+def employee_overview():
+    data = request.json
+    employee_id  = data['employee_id']
+    with db.session.begin():
+        jobs = db.session.execute(db.select(Job).filter_by(emp_id=employee_id).order_by(Job.date_assigned)).scalars()
+        job_list = [job.to_dict() for job in jobs]
+        try:
+            first_job = job_list[0]
+        except IndexError:
+            return jsonify({'message': 'no job currently assigned'})
+        incoming_deadline = db.session.execute(db.select(Milestone).filter_by(job_id=first_job['job_id']).order_by(Milestone.end_date)).scalar_one()
+    overview = {
+        'jobs': job_list,
+        'number_of_jobs': len(job_list),
+        'incoming_deadline': incoming_deadline.end_date
+    }
+    return jsonify({'overview': overview})

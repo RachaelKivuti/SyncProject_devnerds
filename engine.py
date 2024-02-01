@@ -62,6 +62,7 @@ class Job(Base, BaseModel):
     contractor = relationship("Contractor", back_populates="jobs")
     employee = relationship("Employee", back_populates="jobs")
     employee_bids = relationship('Bid', back_populates='job')
+    milestones = relationship('Milestone', back_populates='job')
 
 class Bid(Base, BaseModel):
     """Class defining the employee_bids to hold all the bids a user has"""
@@ -76,11 +77,20 @@ class Bid(Base, BaseModel):
     job = relationship('Job', back_populates='employee_bids')
 
 
-user = argv[1]
-print(user)
-pwd = argv[2]
-pwd  = parse.quote(pwd, safe='')
-database = argv[3]
+class Milestone(Base, BaseModel):
+    __tablename__ = 'milestones'
+    milestone_id = Column(String(36), primary_key=True, nullable=False)
+    milestone_name = Column(String(100), nullable=False)
+    job_id = Column(String(36), ForeignKey('jobs.job_id'), nullable=False, unique=False)
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
+
+    job = relationship('Job', back_populates='milestones')
+# user = argv[1]
+# print(user)
+# pwd = argv[2]
+# pwd  = parse.quote(pwd, safe='')
+# database = argv[3]
 
 
 engine = create_engine(f"mysql+mysqldb://{user}:{pwd}@localhost:3306/{database}")
