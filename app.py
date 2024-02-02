@@ -9,9 +9,7 @@ import urllib
 app = Flask(__name__)
 
 
-# user = 'root'
-# pwd = urllib.parse.quote('!@mElv!s@19')
-# database = 'devnerds'
+
 
 user = ''
 pwd = ''
@@ -22,14 +20,15 @@ db = SQLAlchemy(app)
 
 @app.route('/employee', methods=["POST","GET"])
 def employee():
+    '''Method to create an employee'''
     if request.method == 'POST':
-        try:
-            first_name = request.form['first_name']
-            last_name = request.form['last_name']
-            employee_email = request.form['email']
-            password = request.form['password']
-        except KeyError as e:
-            return jsonify({'message': f'please fill in all the require fields {e}'})
+    
+        first_name = request.form['first_name']
+        last_name = request.form['last_name']
+        employee_email = request.form['email']
+        password = request.form['password']
+        if not first_name or not last_name or not employee_email or not password:
+            return render_template('signin.html', error='Please fill all the required fields')
         id = str(uuid4())
         try:
             new_employee = Employee(
@@ -43,12 +42,13 @@ def employee():
             db.session.commit()
             return jsonify({'message': f'employee {first_name} created'})
         except Exception as e:
-            return jsonify({"message": f"{str(e)}"})
+            return render_template('signin.html', error=e)
     return render_template('signin.html')
 
 
 @app.route('/contractor', methods=["POST", "GET"])
 def contractor():
+    '''End-point to create a new contractor'''
     if request.method == 'POST':
         first_name = request.form['first_name']
         last_name = request.form['last_name']
@@ -69,7 +69,7 @@ def contractor():
             db.session.commit()
             return jsonify({'message': f'contractor {first_name} successively created'})
         except Exception as e:
-            return jsonify({'message': f'{e}'})
+            return render_template('contractor.html', error=e)
     return render_template('contractor.html')
 
 
