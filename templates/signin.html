@@ -16,6 +16,9 @@
         <input type="email" name="email" id="email" placeholder="johndoe@gmail.com"><br>
         <label for="password">password :</label>
         <input type="password" name="password" id="password"><br>
+        {% if error %}
+            <p>{{ error }}</p>
+        {% endif %}
         <button type="submit">Submit</button>
     </form>
 </body>
