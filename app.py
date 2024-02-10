@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import select
 from engine import Base, Employee, Contractor, Job, Bid, Milestone
 from datetime import datetime
 from uuid import uuid4
@@ -8,9 +9,6 @@ import urllib
 
 app = Flask(__name__)
 
-
-
-
 user = ''
 pwd = ''
 database = ''
@@ -18,7 +16,7 @@ database = ''
 app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+mysqldb://{user}:{pwd}@localhost:3306/{database}'
 db = SQLAlchemy(app)
 
-@app.route('/employee', methods=["POST","GET"])
+@app.route('/signup/employee', methods=["POST","GET"])
 def employee():
     '''Method to create an employee'''
     if request.method == 'POST':
@@ -46,7 +44,7 @@ def employee():
     return render_template('signin.html')
 
 
-@app.route('/contractor', methods=["POST", "GET"])
+@app.route('/signup/contractor', methods=["POST", "GET"])
 def contractor():
     '''End-point to create a new contractor'''
     if request.method == 'POST':
@@ -75,6 +73,7 @@ def contractor():
 
 @app.route('/api/v1.0/employees')
 def get_employees():
+    '''Returns all the employees in the platform'''
     with db.session.begin():
         employees = db.session.execute(db.select(Employee).order_by(Employee.employee_email)).scalars()
     try:
@@ -85,6 +84,7 @@ def get_employees():
 
 @app.route('/api/v1.0/employees/<string:id>', methods=['GET'])
 def get_employee():
+    '''Get details of a specific employee'''
     try:
         with db.session.begin():
             employee = db.session.execute(db.select(Employee).filter_by(employee_id=id)).scalar_one()
@@ -93,6 +93,7 @@ def get_employee():
 
 @app.route('/api/v1.0/jobs', methods=["GET"])
 def get_jobs():
+    '''Retrieve all the jobs available in the platform'''
     with db.session.begin():
         jobs = db.session.execute(db.select(Job).filter_by(job_state='bid_on')).scalars()
         job_list = [job.to_dict() for job in jobs]
@@ -100,6 +101,7 @@ def get_jobs():
 
 @app.route('/api/v1.0/jobs', methods=['POST'])
 def create_job():
+    '''API to create a new job'''
     if request.method == 'POST':
         data = request.json
         state = data.get('job_state')
@@ -125,6 +127,7 @@ def create_job():
 
 @app.route('/api/v1.0/bid_job', methods=['POST'])
 def bid_job():
+    '''API for biding a job'''
     if request.method == 'POST':
         data = request.json
         bid_id = str(uuid4())
@@ -143,9 +146,28 @@ def bid_job():
         db.session.commit()
         return jsonify({'message': f'job bidded successively'})
 
+@app.route('/api/v1.0/employee_bids/<string:emp_id>')
+def get_bids(emp_id):
+    '''API to retrieve all the bids that an employee has'''
+    try:
+        with db.session.begin():
+            jobs = db.session.execute(db.select(Bid.job_id).filter_by(emp_id=emp_id).order_by(Bid.date_bid)).scalars()
+
+        print(jobs)
+        jobs = [job for job in jobs]
+        print(jobs)
+        bids_list = []
+        for bid in jobs:
+            job = db.session.execute(select(Job).filter_by(job_id=bid)).scalar_one()
+            bids_list.append(job.to_dict())
+        return jsonify({"employee_bids": bids_list})
+    except Exception as e:
+        return jsonify({"message": str(e)})
+
 
 @app.route('/api/v1.0/add_milestone', methods=['POST'])
 def add_milestone():
+    '''API to add a new milestone for a specific job'''
     data = request.json
     job_id = data['job_id']
     milestone_name = data['milestone_name']
@@ -166,6 +188,7 @@ def add_milestone():
 
 @app.route('/api/v1.0/employee_overview')
 def employee_overview():
+    '''API to return all the details of an employee, the jobs the person is working on/won the bid'''
     data = request.json
     employee_id  = data['employee_id']
     with db.session.begin():

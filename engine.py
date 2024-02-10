@@ -86,11 +86,17 @@ class Milestone(Base, BaseModel):
     end_date = Column(DateTime, nullable=False)
 
     job = relationship('Job', back_populates='milestones')
-user = argv[1]
-print(user)
-pwd = argv[2]
-pwd  = parse.quote(pwd, safe='')
-database = argv[3]
+
+user = ''
+pwd = ''
+database = ''
+
+# user = argv[1]
+# print(user)
+# pwd = argv[2]
+# pwd  = parse.quote(pwd, safe='')
+# database = argv[3]
+
 
 
 engine = create_engine(f"mysql+mysqldb://{user}:{pwd}@localhost:3306/{database}")
