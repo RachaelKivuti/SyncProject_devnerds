@@ -8,8 +8,8 @@ This was a project done during a SYNC hackathon that happened from 29ᵗʰ Janua
 ***Tracking and monitoring the productivity of remote employees/contractors can be challenging, ensuring accountability without micromanaging requires effective performance metrics and expectations. How can technology solve this problem?***
 
 ## Authors
-Rachael Kivuti - frontend
-Elvis Mburu - Backend
+- Rachael Kivuti - frontend
+- Elvis Mburu - Backend
 
 ## API documentation
 
