@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import select
 from engine import Base, Employee, Contractor, Job, Bid, Milestone
@@ -9,12 +9,14 @@ import urllib
 
 app = Flask(__name__)
 
-user = ''
-pwd = ''
-database = ''
+user = '' # database username
+pwd = '' # database password
+pwd  = urllib.parse.quote(pwd, safe='')
+database = '' # database name
 
 app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+mysqldb://{user}:{pwd}@localhost:3306/{database}'
 db = SQLAlchemy(app)
+
 
 @app.route('/signup/employee', methods=["POST","GET"])
 def employee():
@@ -53,7 +55,8 @@ def contractor():
         email = request.form['email']
         password = request.form['password']
         if not first_name or not last_name or not email or not password:
-            return render_template('contractor.html', error="Please fill all required fields.")
+            print(url_for('contractor'))
+            return  render_template('contractor.html', error="Pleas input all the required fields")
         id = str(uuid4())
         try:
             new_contractor = Contractor(
@@ -67,9 +70,9 @@ def contractor():
             db.session.commit()
             return jsonify({'message': f'contractor {first_name} successively created'})
         except Exception as e:
-            return render_template('contractor.html', error=e)
-    return render_template('contractor.html')
+            return render_template('contractor.html', error=str(e))
 
+    return render_template('contractor.html')
 
 @app.route('/api/v1.0/employees')
 def get_employees():
@@ -83,13 +86,58 @@ def get_employees():
         return jsonify({'message': "Error querying the database"})
 
 @app.route('/api/v1.0/employees/<string:id>', methods=['GET'])
-def get_employee():
+def get_employee(id):
     '''Get details of a specific employee'''
     try:
         with db.session.begin():
             employee = db.session.execute(db.select(Employee).filter_by(employee_id=id)).scalar_one()
+            if employee is None:
+                return jsonify({"message": "the employee doens't exist"})
+            employee_details =  employee.to_dict()
     except Exception as e:
-        pass
+        return jsonify({'message': str(e)})
+    print(employee_details)
+    return jsonify({'employee': employee_details})
+
+@app.route('/api/v1.0/employee_overview')
+def employee_overview():
+    '''API to return all the details of an employee, the jobs the person is working on/won the bid'''
+    data = request.json
+    employee_id  = data['employee_id']
+    with db.session.begin():
+        jobs = db.session.execute(db.select(Job).filter_by(emp_id=employee_id).order_by(Job.date_assigned)).scalars()
+        job_list = [job.to_dict() for job in jobs]
+        try:
+            first_job = job_list[0]
+        except IndexError:
+            return jsonify({'message': 'no job currently assigned'})
+        incoming_deadline = db.session.execute(db.select(Milestone).filter_by(job_id=first_job['job_id']).order_by(Milestone.end_date)).scalar_one()
+    overview = {
+        'jobs': job_list,
+        'number_of_jobs': len(job_list),
+        'incoming_deadline': incoming_deadline.end_date
+    }
+    return jsonify({'overview': overview})
+
+@app.route('/api/v1.0/employee_bids')
+def get_bids():
+    '''API to retrieve all the bids that an employee has'''
+    data = request.json
+    emp_id = data['emp_id']
+    try:
+        with db.session.begin():
+            jobs = db.session.execute(db.select(Bid.job_id).filter_by(emp_id=emp_id).order_by(Bid.date_bid)).scalars()
+
+        jobs = [job for job in jobs]
+        bids_list = []
+        for bid in jobs:
+            job = db.session.execute(select(Job).filter_by(job_id=bid)).scalar_one()
+            bids_list.append(job.to_dict())
+        if bids_list == []:
+            return jsonify({"message": "employee doesn't have a pending bid"})
+        return jsonify({"employee_bids": bids_list})
+    except Exception as e:
+        return jsonify({"message": str(e)})
 
 @app.route('/api/v1.0/jobs', methods=["GET"])
 def get_jobs():
@@ -124,7 +172,6 @@ def create_job():
         db.session.commit()
         return jsonify({'message': 'new job created'})
 
-
 @app.route('/api/v1.0/bid_job', methods=['POST'])
 def bid_job():
     '''API for biding a job'''
@@ -146,25 +193,6 @@ def bid_job():
         db.session.commit()
         return jsonify({'message': f'job bidded successively'})
 
-@app.route('/api/v1.0/employee_bids/<string:emp_id>')
-def get_bids(emp_id):
-    '''API to retrieve all the bids that an employee has'''
-    try:
-        with db.session.begin():
-            jobs = db.session.execute(db.select(Bid.job_id).filter_by(emp_id=emp_id).order_by(Bid.date_bid)).scalars()
-
-        print(jobs)
-        jobs = [job for job in jobs]
-        print(jobs)
-        bids_list = []
-        for bid in jobs:
-            job = db.session.execute(select(Job).filter_by(job_id=bid)).scalar_one()
-            bids_list.append(job.to_dict())
-        return jsonify({"employee_bids": bids_list})
-    except Exception as e:
-        return jsonify({"message": str(e)})
-
-
 @app.route('/api/v1.0/add_milestone', methods=['POST'])
 def add_milestone():
     '''API to add a new milestone for a specific job'''
@@ -185,23 +213,3 @@ def add_milestone():
     db.session.add(new_milestone)
     db.session.commit()
     return jsonify({'message': 'milestone added successively'})
-
-@app.route('/api/v1.0/employee_overview')
-def employee_overview():
-    '''API to return all the details of an employee, the jobs the person is working on/won the bid'''
-    data = request.json
-    employee_id  = data['employee_id']
-    with db.session.begin():
-        jobs = db.session.execute(db.select(Job).filter_by(emp_id=employee_id).order_by(Job.date_assigned)).scalars()
-        job_list = [job.to_dict() for job in jobs]
-        try:
-            first_job = job_list[0]
-        except IndexError:
-            return jsonify({'message': 'no job currently assigned'})
-        incoming_deadline = db.session.execute(db.select(Milestone).filter_by(job_id=first_job['job_id']).order_by(Milestone.end_date)).scalar_one()
-    overview = {
-        'jobs': job_list,
-        'number_of_jobs': len(job_list),
-        'incoming_deadline': incoming_deadline.end_date
-    }
-    return jsonify({'overview': overview})
